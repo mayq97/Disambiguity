@@ -13,8 +13,8 @@ import json
 import pymysql
 from itertools import combinations,product
 from tqdm  import tqdm
-from my_lib.mongodb_util import get_mongo_collection,get_mongo_client
-from my_lib.util import aff_sim,name_is_Abbr
+from myq.mongodb_util import get_mongo_collection,get_mongo_client
+from myq.util import aff_sim,name_is_Abbr
 import logging
 logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -114,22 +114,23 @@ def name_disam():
         if equal:
             if flag[i] == 0 and flag[j] == 0:
                 author_id = author_id + 1
-                flag[i] == author_id
-                flag[j] == author_id
+                flag[i] = author_id
+                flag[j] = author_id
                 temp_output[author_id] = set([i,j])
-            if flag[i] > 0 and flag[j] == 0:
-                flag[j] == flag[i]
+            elif flag[i] > 0 and flag[j] == 0:
+                flag[j] = flag[i]
                 temp = temp_output.get(flag[i],set())
                 temp.add(j)
                 temp_output[flag[i]] = temp
-            if flag[i] == 0 and flag[j] > 0:
-                flag[i] == flag[j]
+            elif flag[i] == 0 and flag[j] > 0:
+                flag[i] = flag[j]
                 temp = temp_output.get(flag[j], set())
                 temp.add(i)
                 temp_output[flag[j]] = temp
-            if  flag[j] > 0 and flag[i] > 0:
+            elif  flag[j] > 0 and flag[i] > 0  and not (flag[i] == flag[j]):
                 temp = temp_output[flag[i]] | temp_output[flag[j]]
                 temp_output[flag[i]] = temp
+                del temp_output[flag[j]]
                 for art  in temp:
                     flag[art] = flag[i]
         else:
@@ -150,7 +151,6 @@ def name_disam():
 
     for idx in range(0,sql_1_result_num,batch_size):
         sql = sql_1 + "{},{}".format(str(int(idx)),str(int(batch_size)))
-        logger.info("------- process {} to {} -------".format(str(int(idx)),str(int(batch_size))))
         cursor.execute(sql)
         #SELECT id_list,fname_list,lname_list from author_article_list WHERE num >1 limit 0,1000
         results = cursor.fetchall()
@@ -180,7 +180,7 @@ def name_disam():
             update(temp_output,articles_id_list,fname_list,lname_list)
             row_index = row_index +1
             if row_index % 100 == 0 :
-                logger.info("{} / {}".format(row_index,batch_size))
+                logger.info("process {} to {} at {} / {}".format(idx,idx+batch_size,row_index,batch_size))
 
 
 def name_freq_equal_1():
@@ -228,7 +228,6 @@ def update(temp_output,articles_id_list,fname_list,lname_list):
                               lname_list[id],
                               au_id))
 
-    # logger.info("add {} records to temp list".format(len(articles_id_list)))
     if len(save_data) >= 10000:
         cursor.executemany(r"INSERT INTO result(id, fname, lname,author_id) VALUES (%s,%s,%s,%s)",
                            save_data)
