@@ -13,8 +13,8 @@ import json
 import pymysql
 from itertools import combinations,product
 from tqdm  import tqdm
-from myq.mongodb_util import get_mongo_collection,get_mongo_client
-from myq.util import aff_sim,name_is_Abbr
+from author_name_disam.mongodb_util import get_mongo_collection,get_mongo_client
+from author_name_disam.util import aff_sim,name_is_Abbr
 import logging
 logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
