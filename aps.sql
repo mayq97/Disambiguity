@@ -11,7 +11,7 @@
  Target Server Version : 80018
  File Encoding         : 65001
 
- Date: 17/03/2020 20:52:47
+ Date: 30/03/2020 10:20:24
 */
 
 SET NAMES utf8mb4;
@@ -47,7 +47,8 @@ CREATE TABLE `articles_info`  (
   `fname` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
   `lname` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
   `full_name` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
-  `full_name_2` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL
+  `full_name_2` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `au_type` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL
 ) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
@@ -64,14 +65,33 @@ CREATE TABLE `author_article_list`  (
 ) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
+-- Table structure for cited_num
+-- ----------------------------
+DROP TABLE IF EXISTS `cited_num`;
+CREATE TABLE `cited_num`  (
+  `id` text CHARACTER SET utf8 COLLATE utf8_general_ci,
+  `cited_num` int(11) DEFAULT NULL
+) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
 -- Table structure for result
 -- ----------------------------
 DROP TABLE IF EXISTS `result`;
 CREATE TABLE `result`  (
   `id` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
   `fname` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
+  `lname` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,
   `author_id` int(9) DEFAULT NULL,
-  `lname` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL
+  `full_name_2` varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL
+) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for t_list_row
+-- ----------------------------
+DROP TABLE IF EXISTS `t_list_row`;
+CREATE TABLE `t_list_row`  (
+  `_row` int(11) NOT NULL,
+  PRIMARY KEY (`_row`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
 
 SET FOREIGN_KEY_CHECKS = 1;

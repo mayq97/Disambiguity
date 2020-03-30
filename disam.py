@@ -9,24 +9,22 @@
         B 两位作者至少有一位共同作者；
         C 两位作者至少互相引用了一次；
 '''
+from multiprocessing import Process
 import json
 import pymysql
 from itertools import combinations,product
 from tqdm  import tqdm
-from author_name_disam.mongodb_util import get_mongo_collection,get_mongo_client
-from author_name_disam.util import aff_sim,name_is_Abbr
+from mongodb_util import get_mongo_collection,get_mongo_client
+from util import aff_sim,name_is_Abbr
 import logging
 logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-db = pymysql.connect("localhost","root","admin","aps")
-cursor = db.cursor()
+
 client = get_mongo_client()
 table_articles  = get_mongo_collection(client,"whu_aps","articles")
 table_citation = get_mongo_collection(client,"whu_aps","citation")
 table_result = get_mongo_collection(client,"whu_aps","result")
-author_id = 79857
-save_data = []
 
 
 def coauthor(au_list):
@@ -99,21 +97,66 @@ def get_refs(id_list):
     return refs
 
 
-def name_disam():
+def name_freq_equal_1():
+    """
+    SELECT full_name_2,id_list from author_article_list WHERE num =1
+    名字出现一次的不需要进行消岐
+    :return:
+    """
+    db = pymysql.connect("localhost", "root", "admin", "aps")
+    cursor = db.cursor()
+    sql_2 = "SELECT full_name,id_list,fname_list,lname_list from author_article_list WHERE num =1 ORDER BY num ASC limit "
+    sql_2_result_num = 80006
+
+    batch_size = 10000
+    author_id = 0
+    for idx in tqdm(range(0, sql_2_result_num, batch_size)):
+        sql = sql_2 + "{},{}".format(str(int(idx)), str(int(batch_size)))
+        cursor.execute(sql)
+        results = cursor.fetchall()
+        temp_output = []
+        for row in results:
+            author_id = author_id + 1
+            fname = json.loads(row[2])[0]
+            lname = json.loads(row[3])[0]
+            temp_output.append((json.loads(row[1])[0],
+                                fname,
+                                lname,
+                                row[0],
+                                author_id))
+
+        cursor.executemany(r"INSERT INTO result(id, fname,lname,full_name_2, author_id) VALUES (%s,%s,%s,%s,%s)",
+                       temp_output)
+        db.commit()
+        logger.info("add {} records to db".format(len(temp_output)))
+
+        temp_output.clear()
+        logger.info("*" * 40)
+    cursor.executemany(r"INSERT INTO result(id, fname,lname,full_name_2, author_id) VALUES (%s,%s,%s)",
+                       temp_output)
+    db.commit()
+    print(author_id)
+    db.close()
+
+
+def au_name_disam(start,end,author_id,step):
+
     '''
     SELECT full_name_2,id_list,lname_list,num,all_equal from author_article_list WHERE num >1
     full_name_2 数量出现两次及以上的则需要进行消岐
     :return:
     '''
-    global author_id
+    db = pymysql.connect("localhost", "root", "admin", "aps")
+    cursor = db.cursor()
     sql_1 = "SELECT id_list,fname_list,lname_list from author_article_list WHERE num >1 limit "
-    sql_1_result_num = 145661
-    batch_size = 10000
-    def add_result(i,j,equal):
-        global author_id
+    sql_1_result_num = 145791
+    batch_size = 5000
+    save_data = []
+
+    def add_result(i,j,equal,author_id):
         if equal:
             if flag[i] == 0 and flag[j] == 0:
-                author_id = author_id + 1
+                author_id = author_id + step
                 flag[i] = author_id
                 flag[j] = author_id
                 temp_output[author_id] = set([i,j])
@@ -135,13 +178,14 @@ def name_disam():
                     flag[art] = flag[i]
         else:
             if flag[i] == 0:
-                author_id = author_id+1
+                author_id = author_id+step
                 flag[i] = author_id
                 temp_output[author_id] = set([i])
             if flag[j] == 0:
-                author_id = author_id+1
+                author_id = author_id+step
                 flag[j] = author_id
                 temp_output[author_id] = set([j])
+        return author_id
 
     def cocite(article_1, article_2):
         try:
@@ -149,7 +193,7 @@ def name_disam():
         except:
             return False
 
-    for idx in range(0,sql_1_result_num,batch_size):
+    for idx in range(start,end,batch_size):
         sql = sql_1 + "{},{}".format(str(int(idx)),str(int(batch_size)))
         cursor.execute(sql)
         #SELECT id_list,fname_list,lname_list from author_article_list WHERE num >1 limit 0,1000
@@ -172,78 +216,46 @@ def name_disam():
                 if name_check(fname_list[i],fname_list[j]):
                     temp_art_authors = [art_info[art_id_i]["coauthors"],art_info[art_id_j]["coauthors"]]
                     if aff_check(art_info[art_id_i]["affs"],art_info[art_id_j]["affs"]) or cocite(art_id_i,art_id_j) or coauthor(temp_art_authors):
-                        add_result(i,j,True)
+                        author_id =  add_result(i,j,True,author_id)
                     else:
-                        add_result(i,j,False)
+                        author_id = add_result(i,j,False,author_id)
                 else:
-                    add_result(i,j,False)
-            update(temp_output,articles_id_list,fname_list,lname_list)
-            row_index = row_index +1
+                    author_id = add_result(i, j, False, author_id)
+            for au_id in temp_output.keys():
+                au_art_list = temp_output[au_id]
+                for id in au_art_list:
+                    save_data.append((articles_id_list[id],
+                                      fname_list[id],
+                                      lname_list[id],
+                                      au_id))
+            row_index = row_index + 1
             if row_index % 100 == 0 :
                 logger.info("process {} to {} at {} / {}".format(idx,idx+batch_size,row_index,batch_size))
-
-
-def name_freq_equal_1():
-    """
-    SELECT full_name_2,id_list from author_article_list WHERE num =1
-    名字出现一次的不需要进行消岐
-    :return:
-    """
-    sql_2 = "SELECT full_name,id_list from author_article_list WHERE num =1 ORDER BY num ASC limit "
-    sql_2_result_num = 79857
-
-    batch_size = 1000
-    author_id = 0
-    for idx in tqdm(range(0, sql_2_result_num, 1000)):
-        sql = sql_2 + "{},{}".format(str(int(idx)), str(int(batch_size)))
-        cursor.execute(sql)
-        results = cursor.fetchall()
-        temp_output = []
-        for row in results:
-            author_id = author_id + 1
-            temp_output.append((json.loads(row[1])[0], row[0],author_id))
-
-        cursor.executemany(r"INSERT INTO result(id, full_name_2, author_id) VALUES (%s,%s,%s)",
-                       temp_output)
-        db.commit()
-        logger.info("add ", 1000 , "records to db")
-
-        temp_output.clear()
-        logger.info("*" * 40)
-    print(author_id)
-
-def update(temp_output,articles_id_list,fname_list,lname_list):
-    '''
-    将需要保存的作者信息 暂存在 save_data 中，当暂存数量大于1000时，提交数据
-    :param data:
-    :param full_name_2:
-    :return:
-    '''
-
-    for au_id in temp_output.keys():
-        au_art_list = temp_output[au_id]
-        for id in au_art_list:
-            save_data.append((articles_id_list[id],
-                              fname_list[id],
-                              lname_list[id],
-                              au_id))
-
-    if len(save_data) >= 10000:
+            if len(save_data) >= 10000:
+                cursor.executemany(r"INSERT INTO result(id, fname, lname,author_id) VALUES (%s,%s,%s,%s)",
+                                   save_data)
+                db.commit()
+                logger.info("{} - {} add {} records to db".format(start,end,len(save_data)))
+                save_data.clear()
+                logger.info("*" * 50)
+    if len(save_data) > 0 :
         cursor.executemany(r"INSERT INTO result(id, fname, lname,author_id) VALUES (%s,%s,%s,%s)",
                            save_data)
         db.commit()
-        logger.info("add {} records to db".format(len(save_data)))
-        save_data.clear()
-        logger.info("*"*50)
-
-
+        logger.info("{} - {} add {} records to db".format(start,end,len(save_data)))
+    logger.info("{} - {}finish".format(start,end))
+    cursor.close()
+    db.close()
 if __name__ == "__main__":
     # name_freq_equal_1()
-    name_disam()
-    cursor.executemany(r"INSERT INTO result(id, fname, lname,author_id) VALUES (%s,%s,%s,%s)",
-                       save_data)
-    logger.info("add {} records to db".format(len(save_data)))
-    db.commit()
+    ll = []
+    start_list = [0,75000]
+    for index,start in enumerate(start_list):
+        p = Process(target=au_name_disam,args=(start,start+75000,80006+index,len(start_list)))
+        p.start()
+        ll.append(p)
+    for p in ll:
+        p.join()
     logger.info("Finish ! ")
 
 

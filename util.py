@@ -5,8 +5,7 @@ from sklearn.feature_extraction.text import  TfidfVectorizer, TfidfTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-def aff_sim(aff_1,aff_2,threshold = 0.6):
-
+def aff_sim(aff_1,aff_2,threshold = 0.5):
     '''
     判断两个机构的名称的相似度
     :param aff_1:

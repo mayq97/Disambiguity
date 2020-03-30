@@ -125,36 +125,39 @@ def create_table_articles_info():
             authors = json.loads(row[1])
             for author in authors:
                 try:
-                    fname = author["firstname"] if "firstname" in author.keys() else ""
-                    lname = author["surname"] if "surname" in author.keys() else ""
-                    full_name = fname + " " + lname
-                    if len(fname) >=1 :
-                        full_name_2 = fname[0] + " " + lname
+                    type = author["type"]
+                    if type == "Person":
+                        fname = author["firstname"] if "firstname" in author.keys() else ""
+                        lname = author["surname"] if "surname" in author.keys() else ""
+                        full_name = fname + " " + lname
+                        if len(fname) >=1 :
+                            full_name_2 = fname[0] + " " + lname
+                        else:
+                            full_name_2 = lname
+                        temp_row = [id, fname, lname, full_name.strip(), full_name_2.strip(),type]
                     else:
-                        full_name_2 = lname
-
-                    temp_row = [id,fname,lname,full_name.strip(),full_name_2.strip()]
+                        temp_row = [id, author["name"], "", author["name"].strip(), author["name"].strip(),type]
                     temp.append(tuple(temp_row))
                 except:
                     pass
-        cursor.executemany(r"insert into articles_info(id,fname,lname,full_name,full_name_2) values(%s,%s,%s,%s,%s)",
+        cursor.executemany(r"insert into articles_info(id,fname,lname,full_name,full_name_2,au_type) values(%s,%s,%s,%s,%s,%s)",
                            temp)
         db.commit()
         print("add ",len(temp) ," to db")
-    cursor.execute("""
-        CREATE TABLE author_article_list as SELECT
-    full_name_2,
-    JSON_ARRAYAGG(id) as id_list,
-    JSON_ARRAYAGG(fname) as fname_list,
-    JSON_ARRAYAGG(lname)	as lname_list
-    from 
-    articles_info
-    GROUP BY
-    full_name_2""")
+    # cursor.execute("""
+    #     CREATE TABLE author_article_list as SELECT
+    # full_name_2,
+    # JSON_ARRAYAGG(id) as id_list,
+    # JSON_ARRAYAGG(fname) as fname_list,
+    # JSON_ARRAYAGG(lname)	as lname_list
+    # from
+    # articles_info
+    # GROUP BY
+    # full_name_2""")
 
 
 
 if __name__ == "__main__":
-    file_list = get_data_path()
+    # file_list = get_data_path()
     # create_table_articles(file_list)
-    # create_table_articles_info()
+    create_table_articles_info()
